@@ -16,9 +16,10 @@ A Telegram bot system that monitors ADB device statuses across multiple servers.
 
 1. **[START-HERE.md](START-HERE.md)** ⭐ - Overview and quick links to all guides
 2. **[QUICK-START.md](QUICK-START.md)** - Simple step-by-step setup guide
-3. **[BOT-SERVER-URL-EXPLAINED.md](BOT-SERVER-URL-EXPLAINED.md)** - Understanding the bot server URL
-4. **[GITHUB-SETUP.md](GITHUB-SETUP.md)** - Push to GitHub and deploy to multiple servers
-5. **[SETUP-DIAGRAM.md](SETUP-DIAGRAM.md)** - Visual diagrams and architecture
+3. **[GROUP-CHAT-SUPPORT.md](GROUP-CHAT-SUPPORT.md)** - Using the bot in Telegram groups 👥
+4. **[BOT-SERVER-URL-EXPLAINED.md](BOT-SERVER-URL-EXPLAINED.md)** - Understanding the bot server URL
+5. **[GITHUB-SETUP.md](GITHUB-SETUP.md)** - Push to GitHub and deploy to multiple servers
+6. **[SETUP-DIAGRAM.md](SETUP-DIAGRAM.md)** - Visual diagrams and architecture
 
 ---
 
@@ -26,11 +27,13 @@ A Telegram bot system that monitors ADB device statuses across multiple servers.
 
 - ✅ Monitor ADB devices across unlimited servers
 - ✅ Real-time status updates via Telegram
+- ✅ **Full Telegram group chat support** - Add to groups for team monitoring! 👥
 - ✅ Track device status: Online, Offline, Unauthorized, Missing
 - ✅ Upload and manage device lists per server
 - ✅ Automatic alerts every 5 minutes for devices needing attention
 - ✅ **100% interactive setup - no manual .env editing required!**
 - ✅ Simple deployment with batch files
+- ✅ Support for multiple users and groups simultaneously
 
 ## Architecture
 

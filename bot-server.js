@@ -11,14 +11,24 @@ app.use(express.json());
 // Store server data and device lists
 const servers = new Map();
 const deviceLists = new Map();
-let adminChatId = null;
+const subscribedChats = new Set(); // Support multiple users and groups
 
 // Load persisted data on startup
 function loadData() {
     try {
         if (fs.existsSync('data.json')) {
             const data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
-            if (data.adminChatId) adminChatId = data.adminChatId;
+
+            // Migrate from old single adminChatId to new subscribedChats
+            if (data.adminChatId) {
+                subscribedChats.add(data.adminChatId);
+            }
+
+            // Load multiple subscribed chats
+            if (data.subscribedChats && Array.isArray(data.subscribedChats)) {
+                data.subscribedChats.forEach(chatId => subscribedChats.add(chatId));
+            }
+
             if (data.deviceLists) {
                 Object.entries(data.deviceLists).forEach(([key, value]) => {
                     deviceLists.set(key, value);
@@ -33,7 +43,7 @@ function loadData() {
 function saveData() {
     try {
         const data = {
-            adminChatId,
+            subscribedChats: Array.from(subscribedChats),
             deviceLists: Object.fromEntries(deviceLists)
         };
         fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
@@ -70,17 +80,26 @@ app.get('/api/devices/:serverId', (req, res) => {
 // Telegram bot commands
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    adminChatId = chatId;
+    const chatType = msg.chat.type; // 'private', 'group', 'supergroup', 'channel'
+
+    // Subscribe this chat to notifications
+    subscribedChats.add(chatId);
     saveData();
 
-    bot.sendMessage(chatId,
-        'Welcome to ADB Monitor Bot!\n\n' +
-        'Available commands:\n' +
+    let welcomeMsg = 'Welcome to ADB Monitor Bot!\n\n';
+
+    if (chatType === 'group' || chatType === 'supergroup') {
+        welcomeMsg = '✅ This group is now subscribed to ADB Monitor notifications!\n\n';
+    }
+
+    welcomeMsg += 'Available commands:\n' +
         '/status - Check all servers and device statuses\n' +
         '/servers - List all registered servers\n' +
         '/upload - Upload device list for a server\n' +
-        '/help - Show this help message'
-    );
+        '/stop - Unsubscribe from notifications\n' +
+        '/help - Show this help message';
+
+    bot.sendMessage(chatId, welcomeMsg);
 });
 
 bot.onText(/\/status/, async (msg) => {
@@ -200,6 +219,18 @@ bot.onText(/\/setdevices (.+)/, (msg, match) => {
     );
 });
 
+bot.onText(/\/stop/, (msg) => {
+    const chatId = msg.chat.id;
+
+    if (subscribedChats.has(chatId)) {
+        subscribedChats.delete(chatId);
+        saveData();
+        bot.sendMessage(chatId, '❌ Unsubscribed from ADB Monitor notifications.');
+    } else {
+        bot.sendMessage(chatId, 'You are not currently subscribed. Use /start to subscribe.');
+    }
+});
+
 bot.onText(/\/help/, (msg) => {
     const chatId = msg.chat.id;
 
@@ -210,7 +241,10 @@ bot.onText(/\/help/, (msg) => {
         '/servers - List all registered servers\n' +
         '/upload - Get instructions for uploading device lists\n' +
         '/setdevices [SERVER_ID] - Set device list for a server\n' +
+        '/stop - Unsubscribe from notifications\n' +
         '/help - Show this help message\n\n' +
+        '*Group Support:*\n' +
+        'Add this bot to any Telegram group and send /start to subscribe the group to notifications!\n\n' +
         '*Setup:*\n' +
         '1. Run bot-server.js on a main server\n' +
         '2. Deploy server-agent.js to each device server\n' +
@@ -230,7 +264,7 @@ app.listen(PORT, () => {
 
 // Periodic alert for offline devices (every 5 minutes)
 setInterval(() => {
-    if (!adminChatId) return;
+    if (subscribedChats.size === 0) return;
 
     let alerts = [];
 
@@ -247,10 +281,20 @@ setInterval(() => {
     }
 
     if (alerts.length > 0) {
-        bot.sendMessage(adminChatId,
-            '⚠️ *Alert: Devices Need Attention*\n\n' +
-            alerts.map(a => `• ${a}`).join('\n'),
-            { parse_mode: 'Markdown' }
-        );
+        const alertMessage = '⚠️ *Alert: Devices Need Attention*\n\n' +
+            alerts.map(a => `• ${a}`).join('\n');
+
+        // Send alert to all subscribed chats
+        for (const chatId of subscribedChats) {
+            bot.sendMessage(chatId, alertMessage, { parse_mode: 'Markdown' })
+                .catch(err => {
+                    console.error(`Failed to send alert to chat ${chatId}:`, err.message);
+                    // If chat is not accessible, remove it from subscriptions
+                    if (err.message.includes('chat not found') || err.message.includes('blocked')) {
+                        subscribedChats.delete(chatId);
+                        saveData();
+                    }
+                });
+        }
     }
 }, 5 * 60 * 1000);
